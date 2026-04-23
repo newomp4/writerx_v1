@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    user-select: none;
+  }
+  input,
+  textarea,
+  [contenteditable] {
+    user-select: text;
+  }
+}
+
+@layer components {
+  .scroll-y {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #d4d4d4 transparent;
+  }
+  .scroll-y::-webkit-scrollbar {
+    width: 8px;
+  }
+  .scroll-y::-webkit-scrollbar-thumb {
+    background: #d4d4d4;
+    border-radius: 999px;
+  }
+  .scroll-y::-webkit-scrollbar-thumb:hover {
+    background: #a3a3a3;
+  }
+  .titlebar-drag {
+    -webkit-app-region: drag;
+  }
+  .titlebar-no-drag {
+    -webkit-app-region: no-drag;
+  }
+  .field-label {
+    @apply block text-[11px] uppercase tracking-[0.12em] text-ink-500 font-medium mb-1.5;
+  }
+  .field-input {
+    @apply w-full bg-transparent text-ink-900 placeholder:text-ink-400
+           border-b border-ink-200 focus:border-ink-900
+           outline-none py-1.5 text-sm transition-colors;
+  }
+  .field-textarea {
+    @apply w-full bg-ink-100/60 text-ink-900 placeholder:text-ink-400
+           border border-ink-200 focus:border-ink-900 rounded-md
+           outline-none p-2.5 text-sm transition-colors resize-none leading-relaxed;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5
+           text-[12px] font-medium tracking-tight
+           px-3 h-8 rounded-md
+           border border-ink-200 hover:border-ink-900
+           bg-white hover:bg-ink-900 hover:text-white
+           text-ink-700 transition-colors
+           titlebar-no-drag;
+  }
+  .btn-primary {
+    @apply bg-ink-900 text-white border-ink-900 hover:bg-ink-700 hover:border-ink-700;
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent hover:bg-ink-100 hover:text-ink-900;
+  }
+  .icon-btn {
+    @apply inline-flex items-center justify-center w-7 h-7 rounded-md
+           text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors
+           titlebar-no-drag;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.12em]
+           text-ink-500 px-1.5 py-0.5 rounded border border-ink-200;
+  }
+}
