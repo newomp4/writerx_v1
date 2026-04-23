@@ -20,8 +20,8 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 700,
     titleBarStyle: 'hiddenInset',
-    backgroundColor: '#fafafa',
-    vibrancy: 'under-window',
+    backgroundColor: '#0a0a0a',
+    vibrancy: 'fullscreen-ui',
     visualEffectState: 'active',
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),

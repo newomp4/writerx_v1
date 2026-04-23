@@ -68,9 +68,6 @@ export function renderThumbnail({
     drawPlaceholder(ctx, width, height)
   } else {
     drawCroppedImage(ctx, img, thumb, width, height)
-  }
-
-  if (img) {
     drawGrain(ctx, width, height, thumb.grain)
     drawVignette(ctx, width, height, thumb.vignette)
   }
@@ -115,7 +112,6 @@ function drawCroppedImage(
   const frameAspect = w / h
   const imgAspect = img.naturalWidth / img.naturalHeight
 
-  // "cover" base: image fills frame fully
   let baseW: number, baseH: number
   if (imgAspect > frameAspect) {
     baseH = h
@@ -131,16 +127,17 @@ function drawCroppedImage(
   const slackX = drawW - w
   const slackY = drawH - h
 
-  // offset is -1..1, where -1 = max left/up, 1 = max right/down
   const dx = -slackX / 2 + (thumb.crop.offsetX * slackX) / 2
   const dy = -slackY / 2 + (thumb.crop.offsetY * slackY) / 2
+
+  const saturation = thumb.saturation ?? 0.92
 
   ctx.save()
   ctx.beginPath()
   ctx.rect(0, 0, w, h)
   ctx.clip()
 
-  ctx.filter = `contrast(${thumb.contrast}) saturate(0.92)`
+  ctx.filter = `contrast(${thumb.contrast}) saturate(${saturation})`
   ctx.drawImage(img, dx, dy, drawW, drawH)
   ctx.filter = 'none'
   ctx.restore()
@@ -192,6 +189,148 @@ function drawVignette(
   ctx.restore()
 }
 
+// ─── Overlay (mixed-weight cluster) ─────────────────────────────────────
+//
+// Title is broken into "groups", one per content word. Connector words
+// ("the", "of", "and", …) attach to the nearest content word as a small
+// thin prefix or trailing suffix. Each group renders on its own line with
+// extremely tight leading so the lines visually fuse into one cluster.
+
+const CONNECTORS = new Set([
+  'a', 'an', 'the',
+  'and', 'or', 'but', 'nor', 'yet', 'so',
+  'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from',
+  'as', 'is', 'are', 'be', 'was', 'were', 'am',
+  'into', 'over', 'under', 'about', 'after', 'before',
+  'my', 'your', 'our', 'his', 'her', 'their', 'its',
+  'this', 'that', 'these', 'those', 'it',
+  'no', 'not',
+  'i', 'we', 'you', 'they', 'he', 'she',
+  'vs', 'vs.', '&',
+])
+
+interface ClusterGroup {
+  prefix: string[]
+  content: string
+  suffix: string[]
+}
+
+function isConnector(token: string): boolean {
+  const bare = token.toLowerCase().replace(/[^a-z]/g, '')
+  return CONNECTORS.has(bare)
+}
+
+function buildClusterGroups(title: string): ClusterGroup[] {
+  const tokens = title
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.toUpperCase())
+  if (tokens.length === 0) return []
+
+  const groups: ClusterGroup[] = []
+  let pendingPrefix: string[] = []
+
+  for (const tok of tokens) {
+    if (isConnector(tok)) {
+      pendingPrefix.push(tok)
+    } else {
+      groups.push({ prefix: pendingPrefix, content: tok, suffix: [] })
+      pendingPrefix = []
+    }
+  }
+
+  if (pendingPrefix.length > 0) {
+    if (groups.length > 0) {
+      groups[groups.length - 1].suffix = pendingPrefix
+    } else {
+      // Title is all connectors. Treat the whole thing as one content line.
+      groups.push({
+        prefix: [],
+        content: pendingPrefix.join(' '),
+        suffix: [],
+      })
+    }
+  }
+
+  return groups
+}
+
+interface Ctx2DWithLetterSpacing extends CanvasRenderingContext2D {
+  letterSpacing: string
+}
+
+function setLetterSpacing(ctx: CanvasRenderingContext2D, px: number) {
+  ;(ctx as Ctx2DWithLetterSpacing).letterSpacing = `${px}px`
+}
+
+function blackFont(size: number) {
+  return `900 ${size}px "Arial Black", "Helvetica Neue", Arial, sans-serif`
+}
+
+function thinFont(size: number) {
+  return `400 ${size}px "Arial", "Helvetica Neue", sans-serif`
+}
+
+interface MeasuredGroup {
+  prefixText: string
+  prefixW: number
+  contentW: number
+  suffixText: string
+  suffixW: number
+  totalW: number
+}
+
+function measureGroups(
+  ctx: CanvasRenderingContext2D,
+  groups: ClusterGroup[],
+  titleSize: number,
+  thinSize: number,
+  innerGap: number,
+): { items: MeasuredGroup[]; widest: number; totalH: number } {
+  const items: MeasuredGroup[] = []
+  let widest = 0
+
+  const blackLs = Math.round(titleSize * -0.05)
+  const thinLs = Math.round(thinSize * 0.04)
+
+  for (const g of groups) {
+    ctx.font = thinFont(thinSize)
+    setLetterSpacing(ctx, thinLs)
+    const prefixText = g.prefix.join(' ')
+    const prefixOnly = prefixText ? ctx.measureText(prefixText).width : 0
+    const prefixW = prefixText ? prefixOnly + innerGap : 0
+
+    ctx.font = blackFont(titleSize)
+    setLetterSpacing(ctx, blackLs)
+    const contentW = ctx.measureText(g.content).width
+
+    ctx.font = thinFont(thinSize)
+    setLetterSpacing(ctx, thinLs)
+    const suffixText = g.suffix.join(' ')
+    const suffixOnly = suffixText ? ctx.measureText(suffixText).width : 0
+    const suffixW = suffixText ? suffixOnly + innerGap : 0
+
+    const totalW = prefixW + contentW + suffixW
+    if (totalW > widest) widest = totalW
+
+    items.push({
+      prefixText,
+      prefixW,
+      contentW,
+      suffixText,
+      suffixW,
+      totalW,
+    })
+  }
+
+  // Tight leading: ~82% of titleSize per line
+  const lineStride = titleSize * 0.82
+  const totalH = (groups.length - 1) * lineStride + titleSize
+
+  return { items, widest, totalH }
+}
+
 interface OverlayOpts {
   width: number
   height: number
@@ -210,101 +349,119 @@ function drawOverlay(
   ctx.save()
   ctx.globalCompositeOperation = blend as GlobalCompositeOperation
   ctx.fillStyle = '#ffffff'
-  // For 'difference' blend, white inverts whatever's beneath.
 
-  // Tight tracking - newer browsers support letterSpacing on Canvas2D
-  const ctxAny = ctx as unknown as { letterSpacing?: string }
-  const titleSize = Math.round(width * 0.078)
-  const subSize = Math.round(width * 0.022)
-  const lineGap = Math.round(width * 0.012)
   const padding = Math.round(width * 0.045)
+  const maxW = width - padding * 2
+  const maxH = height - padding * 2
 
-  const TITLE_FONT = `900 ${titleSize}px "Arial Black", "Helvetica Neue", Arial, sans-serif`
-  const SUB_FONT = `100 ${subSize}px "Helvetica Neue", "Arial", sans-serif`
+  const groups = buildClusterGroups(title)
 
-  // measure
-  ctxAny.letterSpacing = `${Math.round(titleSize * -0.05)}px`
-  ctx.font = TITLE_FONT
-  const titleLines = wrapText(ctx, title.toUpperCase(), width * 0.55)
-  const titleHeight = titleLines.length * titleSize * 0.95
+  // ── Auto-fit: shrink until cluster fits the safe area ──
+  let titleSize = width * 0.16
+  let thinSize = titleSize * 0.36
+  let innerGap = titleSize * 0.16
+  let measured = groups.length
+    ? measureGroups(ctx, groups, titleSize, thinSize, innerGap)
+    : { items: [], widest: 0, totalH: 0 }
 
-  ctxAny.letterSpacing = `${Math.round(subSize * -0.02)}px`
-  ctx.font = SUB_FONT
-  const subWidth = subtitle ? ctx.measureText(subtitle.toUpperCase()).width : 0
-  const subHeight = subtitle ? subSize * 1.1 : 0
+  let safety = 60
+  while (
+    safety-- > 0 &&
+    groups.length > 0 &&
+    (measured.widest > maxW || measured.totalH > maxH * 0.92)
+  ) {
+    titleSize *= 0.94
+    thinSize = titleSize * 0.36
+    innerGap = titleSize * 0.16
+    measured = measureGroups(ctx, groups, titleSize, thinSize, innerGap)
+    if (titleSize < 24) break
+  }
 
-  const totalHeight = titleHeight + (subtitle ? subHeight + lineGap : 0)
+  // ── Subtitle (eyebrow) ──
+  const subSize = Math.max(14, Math.round(width * 0.018))
+  const subText = subtitle ? subtitle.toUpperCase() : ''
+  let subW = 0
+  let subH = 0
+  if (subText) {
+    ctx.font = thinFont(subSize)
+    setLetterSpacing(ctx, Math.round(subSize * 0.18))
+    subW = ctx.measureText(subText).width
+    subH = subSize * 1.2
+  }
 
-  const isLeft = position.endsWith('left')
-  const isRight = position.endsWith('right')
-  const isCenter = position.endsWith('center')
+  // ── Anchoring ──
   const isTop = position.startsWith('top')
+  const isCenter = position.endsWith('center')
+  const isRight = position.endsWith('right')
 
-  let originX = padding
-  if (isCenter) originX = width / 2
-  if (isRight) originX = width - padding
-
-  let originY = isTop ? padding : height - padding - totalHeight
-
-  // Subtitle: above the title, like an eyebrow
-  if (subtitle) {
-    ctxAny.letterSpacing = `${Math.round(subSize * -0.02)}px`
-    ctx.font = SUB_FONT
-    ctx.textBaseline = 'top'
-    if (isCenter) {
-      ctx.textAlign = 'center'
-    } else if (isRight) {
-      ctx.textAlign = 'right'
-    } else {
-      ctx.textAlign = 'left'
-    }
-    ctx.fillText(subtitle.toUpperCase(), originX, originY)
-    originY += subHeight + lineGap
+  const anchorXFor = (w: number) => {
+    if (isCenter) return width / 2 - w / 2
+    if (isRight) return width - padding - w
+    return padding
   }
 
-  if (title) {
-    ctxAny.letterSpacing = `${Math.round(titleSize * -0.05)}px`
-    ctx.font = TITLE_FONT
+  const subGap = subText ? Math.round(width * 0.012) : 0
+  const totalH = (subText ? subH + subGap : 0) + measured.totalH
+  const stackTop = isTop ? padding : height - padding - totalH
+
+  // For top positions, subtitle reads better BELOW the cluster (like a
+  // caption). For bottom positions, subtitle goes ABOVE the cluster
+  // (eyebrow). Cluster Y depends on where the subtitle sits.
+  const clusterY = isTop ? stackTop : stackTop + (subText ? subH + subGap : 0)
+  const subtitleY = isTop
+    ? stackTop + measured.totalH + subGap
+    : stackTop
+
+  // ── Subtitle ──
+  if (subText) {
+    ctx.font = thinFont(subSize)
+    setLetterSpacing(ctx, Math.round(subSize * 0.18))
     ctx.textBaseline = 'top'
-    if (isCenter) {
-      ctx.textAlign = 'center'
-    } else if (isRight) {
-      ctx.textAlign = 'right'
-    } else {
-      ctx.textAlign = 'left'
-    }
-    let y = originY
-    for (const line of titleLines) {
-      ctx.fillText(line, originX, y)
-      y += titleSize * 0.95
-    }
+    ctx.textAlign = 'left'
+    ctx.fillText(subText, anchorXFor(subW), subtitleY)
   }
 
-  // reset letterSpacing
-  ctxAny.letterSpacing = '0px'
-  // mark unused
-  void subWidth
+  // ── Cluster lines ──
+  const lineStride = titleSize * 0.82
+  const blackLs = Math.round(titleSize * -0.05)
+  const thinLs = Math.round(thinSize * 0.04)
+
+  let y = clusterY
+  for (let i = 0; i < measured.items.length; i++) {
+    const g = groups[i]
+    const m = measured.items[i]
+    let x = anchorXFor(m.totalW)
+
+    // Prefix (thin, middle-aligned with content's mid)
+    if (m.prefixText) {
+      ctx.font = thinFont(thinSize)
+      setLetterSpacing(ctx, thinLs)
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      ctx.fillText(m.prefixText, x, y + titleSize * 0.5)
+      x += m.prefixW
+    }
+
+    // Content (big black, top-aligned)
+    ctx.font = blackFont(titleSize)
+    setLetterSpacing(ctx, blackLs)
+    ctx.textBaseline = 'top'
+    ctx.textAlign = 'left'
+    ctx.fillText(g.content, x, y)
+    x += m.contentW
+
+    // Suffix (thin, middle-aligned). Leading gap before the text.
+    if (m.suffixText) {
+      ctx.font = thinFont(thinSize)
+      setLetterSpacing(ctx, thinLs)
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      ctx.fillText(m.suffixText, x + innerGap, y + titleSize * 0.5)
+    }
+
+    y += lineStride
+  }
+
+  setLetterSpacing(ctx, 0)
   ctx.restore()
-}
-
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-): string[] {
-  if (!text) return []
-  const words = text.split(/\s+/)
-  const lines: string[] = []
-  let current = ''
-  for (const word of words) {
-    const candidate = current ? current + ' ' + word : word
-    if (ctx.measureText(candidate).width <= maxWidth || !current) {
-      current = candidate
-    } else {
-      lines.push(current)
-      current = word
-    }
-  }
-  if (current) lines.push(current)
-  return lines.slice(0, 4)
 }

@@ -98,11 +98,11 @@ export function ThumbnailEditor() {
               crop: { ...thumb.crop, scale: parseFloat(e.target.value) },
             })
           }
-          className="w-full accent-ink-900"
+          className="w-full accent-ink-100"
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2">
         <Slider
           label="Contrast"
           min={0.8}
@@ -110,6 +110,14 @@ export function ThumbnailEditor() {
           step={0.01}
           value={thumb.contrast}
           onChange={(v) => patchThumbnail({ contrast: v })}
+        />
+        <Slider
+          label="Saturation"
+          min={0}
+          max={2}
+          step={0.01}
+          value={thumb.saturation}
+          onChange={(v) => patchThumbnail({ saturation: v })}
         />
         <Slider
           label="Grain"
@@ -137,8 +145,8 @@ export function ThumbnailEditor() {
               key={p.value}
               className={`h-7 text-[11px] tracking-tight rounded-md border transition-colors ${
                 thumb.overlayPosition === p.value
-                  ? 'bg-ink-900 text-white border-ink-900'
-                  : 'bg-white text-ink-500 border-ink-200 hover:border-ink-900'
+                  ? 'bg-ink-100 text-ink-950 border-ink-100'
+                  : 'bg-ink-900 text-ink-400 border-ink-800 hover:border-ink-100'
               }`}
               onClick={() =>
                 patchThumbnail({ overlayPosition: p.value })
@@ -150,10 +158,10 @@ export function ThumbnailEditor() {
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-[12px] text-ink-700">
+      <label className="flex items-center gap-2 text-[12px] text-ink-300">
         <input
           type="checkbox"
-          className="accent-ink-900"
+          className="accent-ink-100"
           checked={thumb.overlayUseArticleTitle}
           onChange={(e) =>
             patchThumbnail({ overlayUseArticleTitle: e.target.checked })
@@ -222,7 +230,7 @@ function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full accent-ink-900"
+        className="w-full accent-ink-100"
       />
     </div>
   )
@@ -300,16 +308,16 @@ function CropFrame({
           onUpload()
         }
       }}
-      className={`relative w-full rounded-lg overflow-hidden bg-ink-100
+      className={`relative w-full rounded-lg overflow-hidden bg-ink-950
                   border ${
                     drag
-                      ? 'border-ink-900 border-2'
-                      : 'border-ink-200'
+                      ? 'border-ink-100 border-2'
+                      : 'border-ink-800'
                   }
                   ${
                     thumb.imageSrc
                       ? 'cursor-grab active:cursor-grabbing'
-                      : 'cursor-pointer hover:border-ink-900'
+                      : 'cursor-pointer hover:border-ink-100'
                   } transition-colors`}
     >
       <ThumbnailCanvas
@@ -320,7 +328,7 @@ function CropFrame({
 
       {!thumb.imageSrc && (
         <div className="absolute inset-0 flex flex-col items-center justify-center
-                        text-ink-400 gap-1 pointer-events-none">
+                        text-ink-500 gap-1 pointer-events-none">
           <IconUpload size={20} />
           <div className="text-[11px] uppercase tracking-[0.12em]">
             Drop image

@@ -89,12 +89,12 @@ function resetArticle() {
 export function TopBar() {
   const title = useStore((s) => s.article.title)
   return (
-    <header className="titlebar-drag h-11 px-4 flex items-center justify-between bg-white">
+    <header className="titlebar-drag h-11 px-4 flex items-center justify-between bg-ink-950">
       <div className="flex items-center gap-3 pl-16">
-        <span className="text-[13px] font-semibold tracking-tight text-ink-900">
+        <span className="text-[13px] font-semibold tracking-tight text-ink-100">
           Writerx
         </span>
-        <span className="text-[12px] text-ink-400 truncate max-w-[280px]">
+        <span className="text-[12px] text-ink-500 truncate max-w-[280px]">
           {title || 'Untitled article'}
         </span>
       </div>

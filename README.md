@@ -2,12 +2,14 @@
 
 A focused desktop writer for X articles. Split-screen: editor on the right,
 live preview on the left. Drop in a photo and Writerx applies a consistent
-thumbnail treatment — contrast bump, film grain, vignette, and an inverted
-Arial Black + thin overlay — so every article you ship looks like it came
-from the same publication.
+thumbnail treatment — contrast / saturation, film grain, vignette, and a
+mixed-weight title cluster (Arial Black for content words, Arial for the
+small connectors like *the*, *of*, *and*) painted with a `difference` blend
+so it stays readable on any image.
 
-Mac only. Built with Electron, React, TypeScript, Vite, Tailwind. Everything
-the project needs lives inside this folder — delete the folder and it's gone.
+Mac only, dark mode only. Built with Electron, React, TypeScript, Vite,
+Tailwind. Everything the project needs lives inside this folder — delete
+the folder and it's gone.
 
 ---
 
@@ -58,9 +60,9 @@ consistent across all your articles. Pipeline lives in
 
 1. **Crop** — your photo is drawn into a 1600×900 frame using a "cover"
    fit, then transformed by your zoom + pan.
-2. **Contrast + slight desaturation** — applied via the Canvas2D `filter`
-   property (`contrast(1.18) saturate(0.92)` by default). Gives photos a
-   little more punch without crushing them.
+2. **Contrast + saturation** — applied via the Canvas2D `filter`
+   property (`contrast(1.18) saturate(0.92)` by default). Both are
+   adjustable per-article from the sliders.
 3. **Film grain** — a 360×360 noise tile is generated once and tiled across
    the frame using the `overlay` blend mode. The overlay blend brightens
    highlights and darkens shadows where the noise is brighter / darker than
@@ -69,17 +71,22 @@ consistent across all your articles. Pipeline lives in
 4. **Vignette** — a radial gradient from transparent (center) to dark
    (edges), composited with `multiply`. Gives focus to the middle of the
    frame.
-5. **Title overlay** — Arial Black for the title, a thin sans for the
-   eyebrow, both painted in white on a layer with `globalCompositeOperation
-   = "difference"`. The "difference" blend means the text becomes the
-   inverse of whatever pixel is below it: dark photo → bright text, bright
-   photo → dark text, so it always reads cleanly without an explicit drop
-   shadow. Letter-spacing is set to roughly −5% of the font size for that
-   tight editorial look.
+5. **Title cluster** — the title is broken into "groups", one per content
+   word. Connector words (`the`, `of`, `and`, `to`, `for`, `with`, `is`,
+   etc. — see the full list in `effects.ts`) attach to the nearest content
+   word as a small thin Arial prefix. Each group renders on its own line
+   with a leading of ~82% of the font size, so lines visually fuse into
+   one block. Inside each line, the small thin word is vertically *centered*
+   against the big Arial Black word, so it nests inside the cap height
+   instead of sitting on the same baseline. Letter-spacing on the bold is
+   roughly −5% (tight). The whole thing is painted in **white** with
+   `globalCompositeOperation = "difference"`, so each pixel becomes the
+   inverse of whatever's underneath — the cluster is always readable
+   regardless of the photo, no drop shadow needed.
 
-You can tweak the contrast / grain / vignette sliders per article, and pick
-one of six overlay positions, but the *style* (fonts, blend mode, tracking,
-sizing scale) is fixed so the look stays consistent.
+You can tweak the contrast / saturation / grain / vignette sliders per
+article and pick one of six overlay positions, but the *style* (fonts,
+blend mode, tracking, sizing rules) is fixed so the look stays consistent.
 
 ---
 

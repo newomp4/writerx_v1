@@ -27,6 +27,7 @@ export interface Thumbnail {
   imageSrc: string | null
   crop: CropTransform
   contrast: number
+  saturation: number
   grain: number
   vignette: number
   overlayBlend: OverlayBlend
@@ -48,6 +49,7 @@ export const defaultThumbnail = (): Thumbnail => ({
   imageSrc: null,
   crop: { scale: 1, offsetX: 0, offsetY: 0 },
   contrast: 1.18,
+  saturation: 0.92,
   grain: 0.32,
   vignette: 0.28,
   overlayBlend: 'difference',
